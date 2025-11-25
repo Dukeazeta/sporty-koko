@@ -1,6 +1,7 @@
-// src/lib/services/dataService.ts
+// src/lib/services/dataServiceCached.ts
 
 import { cacheManager, CACHE_KEYS, CACHE_TTL } from '../cache/cacheManager';
+
 export interface Match {
     id: number;
     homeTeam: string;
@@ -134,10 +135,47 @@ export const resetRateLimit = (): void => {
     requestCache.clear();
 };
 
+// Helper function to check cache before making API calls
+const checkCache = async <T>(key: string): Promise<T | null> => {
+    try {
+        return await cacheManager.get<T>(key);
+    } catch (error) {
+        console.warn(`Cache check failed for key ${key}:`, error);
+        return null;
+    }
+};
+
+// Helper function to set cache with proper structure
+const setCache = async <T>(
+    key: string,
+    data: T,
+    ttl: number,
+    rateInfo: RateLimitInfo
+): Promise<void> => {
+    try {
+        const dataWithRateInfo = { ...data, rateLimitInfo: rateInfo };
+        await cacheManager.set(key, dataWithRateInfo, ttl);
+    } catch (error) {
+        console.warn(`Cache set failed for key ${key}:`, error);
+    }
+};
+
 export const fetchCompetitions = async (): Promise<{ competitions: Competition[], rateLimitInfo: RateLimitInfo }> => {
+    const cacheKey = CACHE_KEYS.COMPETITIONS;
+
+    // Check cache first
+    const cached = await checkCache<{ competitions: Competition[], rateLimitInfo: RateLimitInfo }>(cacheKey);
+    if (cached) {
+        console.log('[fetchCompetitions] Cache hit');
+        return cached;
+    }
+
+    console.log('[fetchCompetitions] Cache miss, fetching from API');
+
     try {
         const rateStatus = checkRateLimit();
         if (rateStatus.isRateLimited) {
+            console.log('[fetchCompetitions] Rate limited');
             return { competitions: [], rateLimitInfo: rateStatus };
         }
 
@@ -148,13 +186,14 @@ export const fetchCompetitions = async (): Promise<{ competitions: Competition[]
         const res = await fetch(url, { headers, next: { revalidate: 86400 } }); // Cache for 24h
 
         handleRateLimitResponse(res);
+        const currentRateInfo = getRateLimitInfo();
 
         if (res.status === 429) {
-            return { competitions: [], rateLimitInfo: getRateLimitInfo() };
+            return { competitions: [], rateLimitInfo: currentRateInfo };
         }
 
         if (!res.ok) {
-            return { competitions: [], rateLimitInfo: getRateLimitInfo() };
+            return { competitions: [], rateLimitInfo: currentRateInfo };
         }
 
         const data = await res.json();
@@ -166,7 +205,12 @@ export const fetchCompetitions = async (): Promise<{ competitions: Competition[]
             code: c.code
         })) || [];
 
-        return { competitions, rateLimitInfo: getRateLimitInfo() };
+        const result = { competitions, rateLimitInfo: currentRateInfo };
+
+        // Cache the successful result
+        await setCache(cacheKey, result, CACHE_TTL.COMPETITIONS, currentRateInfo);
+
+        return result;
     } catch (error) {
         console.error("[fetchCompetitions] Error:", error);
         return { competitions: [], rateLimitInfo: getRateLimitInfo() };
@@ -174,6 +218,19 @@ export const fetchCompetitions = async (): Promise<{ competitions: Competition[]
 };
 
 export const fetchUpcomingMatches = async (competitionId?: number): Promise<{ matches: Match[], rateLimitInfo: RateLimitInfo }> => {
+    const cacheKey = competitionId
+        ? `${CACHE_KEYS.MATCHES}competition_${competitionId}`
+        : `${CACHE_KEYS.MATCHES}all`;
+
+    // Check cache first
+    const cached = await checkCache<{ matches: Match[], rateLimitInfo: RateLimitInfo }>(cacheKey);
+    if (cached) {
+        console.log('[fetchUpcomingMatches] Cache hit');
+        return cached;
+    }
+
+    console.log('[fetchUpcomingMatches] Cache miss, fetching from API');
+
     try {
         const rateStatus = checkRateLimit();
         if (rateStatus.isRateLimited) {
@@ -196,19 +253,20 @@ export const fetchUpcomingMatches = async (competitionId?: number): Promise<{ ma
         const res = await fetch(url, { headers, next: { revalidate: 60 } });
 
         handleRateLimitResponse(res);
+        const currentRateInfo = getRateLimitInfo();
 
         if (res.status === 429) {
-            return { matches: [], rateLimitInfo: getRateLimitInfo() };
+            return { matches: [], rateLimitInfo: currentRateInfo };
         }
 
         if (!res.ok) {
-            return { matches: [], rateLimitInfo: getRateLimitInfo() };
+            return { matches: [], rateLimitInfo: currentRateInfo };
         }
 
         const data = await res.json();
 
         if (!data.matches) {
-            return { matches: [], rateLimitInfo: getRateLimitInfo() };
+            return { matches: [], rateLimitInfo: currentRateInfo };
         }
 
         const matches = data.matches.map((m: any) => ({
@@ -225,7 +283,12 @@ export const fetchUpcomingMatches = async (competitionId?: number): Promise<{ ma
             }
         }));
 
-        return { matches, rateLimitInfo: getRateLimitInfo() };
+        const result = { matches, rateLimitInfo: currentRateInfo };
+
+        // Cache the successful result with shorter TTL for matches
+        await setCache(cacheKey, result, CACHE_TTL.MATCHES, currentRateInfo);
+
+        return result;
     } catch (error) {
         console.error("[fetchUpcomingMatches] Error:", error);
         return { matches: [], rateLimitInfo: getRateLimitInfo() };
@@ -233,6 +296,17 @@ export const fetchUpcomingMatches = async (competitionId?: number): Promise<{ ma
 };
 
 export const fetchTeamHistory = async (teamId: string | number): Promise<{ matches: Match[], rateLimitInfo: RateLimitInfo }> => {
+    const cacheKey = `${CACHE_KEYS.TEAM_HISTORY}${teamId}`;
+
+    // Check cache first
+    const cached = await checkCache<{ matches: Match[], rateLimitInfo: RateLimitInfo }>(cacheKey);
+    if (cached) {
+        console.log(`[fetchTeamHistory] Cache hit for team ${teamId}`);
+        return cached;
+    }
+
+    console.log(`[fetchTeamHistory] Cache miss for team ${teamId}, fetching from API`);
+
     try {
         const rateStatus = checkRateLimit();
         if (rateStatus.isRateLimited) {
@@ -244,18 +318,19 @@ export const fetchTeamHistory = async (teamId: string | number): Promise<{ match
         recordRequest();
         const res = await fetch(url, { headers, next: { revalidate: 3600 } });
         handleRateLimitResponse(res);
+        const currentRateInfo = getRateLimitInfo();
 
         if (res.status === 429) {
-            return { matches: [], rateLimitInfo: getRateLimitInfo() };
+            return { matches: [], rateLimitInfo: currentRateInfo };
         }
 
         if (!res.ok) {
-            return { matches: [], rateLimitInfo: getRateLimitInfo() };
+            return { matches: [], rateLimitInfo: currentRateInfo };
         }
 
         const data = await res.json();
 
-        if (!data.matches) return { matches: [], rateLimitInfo: getRateLimitInfo() };
+        if (!data.matches) return { matches: [], rateLimitInfo: currentRateInfo };
 
         const matches = data.matches.map((m: any) => ({
             id: m.id,
@@ -271,7 +346,12 @@ export const fetchTeamHistory = async (teamId: string | number): Promise<{ match
             }
         }));
 
-        return { matches, rateLimitInfo: getRateLimitInfo() };
+        const result = { matches, rateLimitInfo: currentRateInfo };
+
+        // Cache the successful result
+        await setCache(cacheKey, result, CACHE_TTL.TEAM_HISTORY, currentRateInfo);
+
+        return result;
     } catch (error) {
         console.error(`Error fetching history for team ${teamId}:`, error);
         return { matches: [], rateLimitInfo: getRateLimitInfo() };
@@ -279,6 +359,17 @@ export const fetchTeamHistory = async (teamId: string | number): Promise<{ match
 };
 
 export const fetchHeadToHead = async (homeTeamId: number, awayTeamId: number): Promise<{ matches: Match[], rateLimitInfo: RateLimitInfo }> => {
+    const cacheKey = `${CACHE_KEYS.HEAD_TO_HEAD}${homeTeamId}_vs_${awayTeamId}`;
+
+    // Check cache first
+    const cached = await checkCache<{ matches: Match[], rateLimitInfo: RateLimitInfo }>(cacheKey);
+    if (cached) {
+        console.log(`[fetchHeadToHead] Cache hit for ${homeTeamId} vs ${awayTeamId}`);
+        return cached;
+    }
+
+    console.log(`[fetchHeadToHead] Cache miss for ${homeTeamId} vs ${awayTeamId}, fetching from API`);
+
     try {
         const rateStatus = checkRateLimit();
         if (rateStatus.isRateLimited) {
@@ -290,18 +381,19 @@ export const fetchHeadToHead = async (homeTeamId: number, awayTeamId: number): P
         recordRequest();
         const res = await fetch(url, { headers, next: { revalidate: 86400 } });
         handleRateLimitResponse(res);
+        const currentRateInfo = getRateLimitInfo();
 
         if (res.status === 429) {
-            return { matches: [], rateLimitInfo: getRateLimitInfo() };
+            return { matches: [], rateLimitInfo: currentRateInfo };
         }
 
         if (!res.ok) {
-            return { matches: [], rateLimitInfo: getRateLimitInfo() };
+            return { matches: [], rateLimitInfo: currentRateInfo };
         }
 
         const data = await res.json();
 
-        if (!data.matches) return { matches: [], rateLimitInfo: getRateLimitInfo() };
+        if (!data.matches) return { matches: [], rateLimitInfo: currentRateInfo };
 
         const matches = data.matches.map((m: any) => ({
             id: m.id,
@@ -317,9 +409,60 @@ export const fetchHeadToHead = async (homeTeamId: number, awayTeamId: number): P
             }
         }));
 
-        return { matches, rateLimitInfo: getRateLimitInfo() };
+        const result = { matches, rateLimitInfo: currentRateInfo };
+
+        // Cache the successful result
+        await setCache(cacheKey, result, CACHE_TTL.HEAD_TO_HEAD, currentRateInfo);
+
+        return result;
     } catch (error) {
         console.error(`Error fetching H2H for ${homeTeamId} vs ${awayTeamId}:`, error);
         return { matches: [], rateLimitInfo: getRateLimitInfo() };
     }
+};
+
+// Cache management utilities
+export const clearCache = async (): Promise<void> => {
+    try {
+        await cacheManager.clear();
+        console.log('[DataService] All caches cleared');
+    } catch (error) {
+        console.error('[DataService] Error clearing cache:', error);
+    }
+};
+
+export const clearCompetitionCache = async (): Promise<void> => {
+    try {
+        await cacheManager.clearByPrefix(CACHE_KEYS.COMPETITIONS);
+        console.log('[DataService] Competition cache cleared');
+    } catch (error) {
+        console.error('[DataService] Error clearing competition cache:', error);
+    }
+};
+
+export const clearMatchCache = async (): Promise<void> => {
+    try {
+        await cacheManager.clearByPrefix(CACHE_KEYS.MATCHES);
+        console.log('[DataService] Match cache cleared');
+    } catch (error) {
+        console.error('[DataService] Error clearing match cache:', error);
+    }
+};
+
+export const clearTeamCache = async (teamId?: string | number): Promise<void> => {
+    try {
+        if (teamId) {
+            await cacheManager.delete(`${CACHE_KEYS.TEAM_HISTORY}${teamId}`);
+            console.log(`[DataService] Team cache cleared for team ${teamId}`);
+        } else {
+            await cacheManager.clearByPrefix(CACHE_KEYS.TEAM_HISTORY);
+            console.log('[DataService] All team cache cleared');
+        }
+    } catch (error) {
+        console.error('[DataService] Error clearing team cache:', error);
+    }
+};
+
+export const getCacheMetrics = () => {
+    return cacheManager.getMetrics();
 };

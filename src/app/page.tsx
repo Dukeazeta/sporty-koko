@@ -3,11 +3,14 @@ import Link from 'next/link';
 import { fetchCompetitions } from '@/lib/services/dataService';
 import { IconArrowRight, IconTrophy, IconStar, IconFlame } from '@/components/Icons';
 
+import RateLimitUpdater from '@/components/RateLimitUpdater';
+
 export default async function Home() {
-  const competitions = await fetchCompetitions();
+  const { competitions, rateLimitInfo } = await fetchCompetitions();
 
   return (
     <main className="min-h-screen p-4 md:p-8 max-w-5xl mx-auto bg-[var(--neo-bg)]">
+      <RateLimitUpdater rateLimitInfo={rateLimitInfo} />
       {/* Header Section */}
       <header className="mb-12 md:mb-16 text-center relative">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-3xl h-full bg-[var(--neo-yellow)] -rotate-1 border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] z-0"></div>

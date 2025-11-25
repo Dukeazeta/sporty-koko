@@ -1,6 +1,5 @@
 // src/lib/services/dataService.ts
 
-import { cacheManager, CACHE_KEYS, CACHE_TTL } from '../cache/cacheManager';
 export interface Match {
     id: number;
     homeTeam: string;

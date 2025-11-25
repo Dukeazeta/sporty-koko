@@ -1,5 +1,5 @@
 
-import { generatePrediction } from './predictionService';
+import { generatePrediction, generateEnhancedPrediction } from './predictionService';
 import { Match } from './dataService';
 
 const mockMatch: Match = {
@@ -34,8 +34,16 @@ const homeHistory = createHistory([true, true, true, true, true, false, false, f
 const awayHistory = createHistory([false, false, false, false, false, true, true, true, true, true]);
 
 const prediction = generatePrediction(mockMatch, homeHistory, awayHistory);
+console.log('Basic Prediction:', prediction);
 
-console.log('Prediction:', prediction);
+// Test enhanced prediction (without H2H)
+const enhancedPrediction = generateEnhancedPrediction(mockMatch, homeHistory, awayHistory);
+console.log('Enhanced Prediction:', enhancedPrediction);
+
+// Test with H2H data
+const h2hHistory = createHistory([true, true, false, true, false]); // 60% BTTS in H2H
+const enhancedWithH2H = generateEnhancedPrediction(mockMatch, homeHistory, awayHistory, h2hHistory);
+console.log('Enhanced with H2H:', enhancedWithH2H);
 
 // Expected:
 // Home Form: 100%, Overall: 50% -> Weighted: (100*0.6) + (50*0.4) = 60 + 20 = 80%
