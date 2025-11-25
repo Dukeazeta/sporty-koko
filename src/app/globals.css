@@ -1,26 +1,79 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Professional Neobrutalism Palette */
+  --neo-bg: #ffffff;
+  --neo-text: #000000;
+  --neo-shadow: #000000;
+
+  /* Vibrant Accents */
+  --neo-yellow: #FFDE00;
+  /* Bright standard yellow */
+  --neo-pink: #FF69B4;
+  /* Hot pink */
+  --neo-green: #00FF41;
+  /* Matrix/Neon green */
+  --neo-blue: #0047FF;
+  /* International Klein Blue */
+  --neo-purple: #9D00FF;
+  /* Electric Purple */
+  --neo-orange: #FF5F00;
+  /* Bright Orange */
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+@layer base {
+  body {
+    background-color: var(--neo-bg);
+    color: var(--neo-text);
+    font-family: var(--font-geist-sans), sans-serif;
+  }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: -0.05em;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer components {
+  .neo-box {
+    @apply border-4 border-black transition-all duration-200;
+    box-shadow: 8px 8px 0px 0px rgba(0, 0, 0, 1);
+  }
+
+  .neo-box:hover {
+    @apply translate-x-[-4px] translate-y-[-4px];
+    box-shadow: 12px 12px 0px 0px rgba(0, 0, 0, 1);
+  }
+
+  .neo-box:active {
+    @apply translate-x-[0px] translate-y-[0px];
+    box-shadow: 0px 0px 0px 0px rgba(0, 0, 0, 1);
+  }
+
+  .neo-button {
+    @apply px-6 py-3 font-black text-lg border-4 border-black bg-white transition-all;
+    box-shadow: 4px 4px 0px 0px rgba(0, 0, 0, 1);
+  }
+
+  .neo-button:hover {
+    @apply bg-[var(--neo-yellow)];
+  }
+
+  .neo-button:active {
+    @apply shadow-none translate-x-[4px] translate-y-[4px];
+  }
+
+  .neo-input {
+    @apply w-full p-3 font-bold border-4 border-black focus:outline-none transition-shadow;
+  }
+
+  .neo-input:focus {
+    box-shadow: 4px 4px 0px 0px rgba(0, 0, 0, 1);
+  }
 }
