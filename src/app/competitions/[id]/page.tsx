@@ -8,22 +8,31 @@ interface Props {
     params: Promise<{ id: string }>;
 }
 
-export default async function CompetitionPage({ params }: Props) {
+export default async function CompetitionPage({ params, searchParams }: { params: Promise<{ id: string }>, searchParams: Promise<{ page?: string }> }) {
     const { id } = await params;
+    const { page } = await searchParams;
     const competitionId = parseInt(id);
+    const currentPage = parseInt(page || '1');
+    const pageSize = 5;
 
     const matches = await fetchUpcomingMatches(competitionId);
 
-    // Slice to fewer matches to avoid hitting rate limits immediately (Free tier: 10 req/min)
-    const limitedMatches = matches.slice(0, 5);
+    // Calculate pagination
+    const totalMatches = matches.length;
+    const totalPages = Math.ceil(totalMatches / pageSize);
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+
+    // Slice matches for current page
+    const currentMatches = matches.slice(startIndex, endIndex);
 
     const predictions = [];
-    for (const match of limitedMatches) {
+    for (const match of currentMatches) {
         const homeHistory = await fetchTeamHistory(match.homeTeamId);
         // Add a small delay to be nice to the API
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 500));
         const awayHistory = await fetchTeamHistory(match.awayTeamId);
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 500));
 
         predictions.push(generatePrediction(match, homeHistory, awayHistory));
     }
@@ -47,7 +56,7 @@ export default async function CompetitionPage({ params }: Props) {
                 </div>
             </header>
 
-            <div className="grid gap-8 relative z-10">
+            <div className="grid gap-8 relative z-10 mb-12">
                 {predictions.map((p, index) => (
                     <div key={p.matchId} className={`neo-box p-8 relative bg-white ${index % 2 === 0 ? 'rotate-1' : '-rotate-1'} hover:rotate-0 transition-transform`}>
 
@@ -95,6 +104,33 @@ export default async function CompetitionPage({ params }: Props) {
                     </div>
                 )}
             </div>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+                <div className="flex justify-between items-center font-mono font-bold bg-white border-4 border-black p-4 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
+                    {currentPage > 1 ? (
+                        <Link href={`/competitions/${competitionId}?page=${currentPage - 1}`} className="neo-button flex items-center gap-2">
+                            <IconArrowRight className="w-5 h-5 rotate-180" /> PREVIOUS
+                        </Link>
+                    ) : (
+                        <div className="opacity-50 cursor-not-allowed flex items-center gap-2 px-6 py-3 border-2 border-black bg-gray-200">
+                            <IconArrowRight className="w-5 h-5 rotate-180" /> PREVIOUS
+                        </div>
+                    )}
+
+                    <span className="text-lg">PAGE {currentPage} OF {totalPages}</span>
+
+                    {currentPage < totalPages ? (
+                        <Link href={`/competitions/${competitionId}?page=${currentPage + 1}`} className="neo-button flex items-center gap-2">
+                            NEXT <IconArrowRight className="w-5 h-5" />
+                        </Link>
+                    ) : (
+                        <div className="opacity-50 cursor-not-allowed flex items-center gap-2 px-6 py-3 border-2 border-black bg-gray-200">
+                            NEXT <IconArrowRight className="w-5 h-5" />
+                        </div>
+                    )}
+                </div>
+            )}
 
             <footer className="mt-24 text-center font-mono text-sm border-t-4 border-black pt-8 pb-8 bg-[var(--neo-bg)]">
                 <p className="font-bold">SPORTYKOKO © 2025</p>
