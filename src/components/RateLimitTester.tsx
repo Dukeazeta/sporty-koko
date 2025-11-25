@@ -10,7 +10,7 @@ export const RateLimitTester: React.FC = () => {
         const resetTime = new Date(Date.now() + 60000); // 1 minute from now
         updateRateLimitInfo({
             isRateLimited: true,
-            resetTime,
+            resetTime: resetTime.toISOString(),
             remainingRequests: 0,
             cooldownMinutes: 1
         });

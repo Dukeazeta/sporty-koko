@@ -85,7 +85,9 @@ export class CacheInvalidationService {
         const prefixes = [CACHE_KEYS.MATCHES];
 
         if (competitionId) {
-            prefixes.push(`${CACHE_KEYS.MATCHES}competition_${competitionId}`);
+            // We need to invalidate both the general matches and the specific competition
+            // Since clearByPrefix works with exact prefixes, we'll add this as a separate key deletion
+            await cacheManager.delete(`${CACHE_KEYS.MATCHES}competition_${competitionId}`);
         }
 
         await this.invalidateCache({
@@ -297,7 +299,7 @@ export class CacheErrorRecovery {
 
             // Test basic cache operations
             const testKey = 'integrity_test_' + Date.now();
-            await cacheManager.set(testKey, { test: true }, 1000);
+            await cacheManager.set(testKey, { test: true }, { ttl: 1000, persistToStorage: true });
             const retrieved = await cacheManager.get(testKey);
             await cacheManager.delete(testKey);
 

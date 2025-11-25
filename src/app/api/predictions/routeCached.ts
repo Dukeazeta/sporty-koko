@@ -1,6 +1,6 @@
 // src/app/api/predictions/routeCached.ts
 import { NextResponse } from 'next/server';
-import { fetchUpcomingMatches, fetchTeamHistory, fetchHeadToHead, RateLimitInfo } from '@/lib/services/dataServiceCached';
+import { fetchUpcomingMatches, fetchTeamHistory, fetchHeadToHead, RateLimitInfo, Match } from '@/lib/services/dataServiceCached';
 import { generateEnhancedPrediction } from '@/lib/services/predictionService';
 import { cacheManager, CACHE_KEYS, CACHE_TTL } from '@/lib/cache/cacheManager';
 
@@ -97,12 +97,12 @@ export async function GET() {
                         };
 
                         // Cache the error result for a shorter time
-                        await cacheManager.set(matchCacheKey, errorResult, 5 * 60 * 1000); // 5 minutes
+                        await cacheManager.set(matchCacheKey, errorResult, { ttl: 5 * 60 * 1000, persistToStorage: true }); // 5 minutes
                         return errorResult;
                     }
 
                     // Fetch head-to-head data (with rate limit check)
-                    let h2hResult = { matches: [], rateLimitInfo: { isRateLimited: false } as RateLimitInfo };
+                    let h2hResult: { matches: Match[], rateLimitInfo: RateLimitInfo } = { matches: [], rateLimitInfo: { isRateLimited: false } };
                     try {
                         h2hResult = await fetchHeadToHead(match.homeTeamId, match.awayTeamId);
                     } catch (error) {
@@ -133,7 +133,7 @@ export async function GET() {
                     };
 
                     // Cache the successful prediction
-                    await cacheManager.set(matchCacheKey, successResult, CACHE_TTL.PREDICTIONS);
+                    await cacheManager.set(matchCacheKey, successResult, { ttl: CACHE_TTL.PREDICTIONS, persistToStorage: true });
                     return successResult;
 
                 } catch (error) {
@@ -147,7 +147,7 @@ export async function GET() {
                     };
 
                     // Cache errors for a short time
-                    await cacheManager.set(matchCacheKey, errorResult, 5 * 60 * 1000); // 5 minutes
+                    await cacheManager.set(matchCacheKey, errorResult, { ttl: 5 * 60 * 1000, persistToStorage: true }); // 5 minutes
                     return errorResult;
                 }
             })
@@ -182,7 +182,7 @@ export async function GET() {
         };
 
         // Cache the complete response
-        await cacheManager.set(cacheKey, responseData, 10 * 60 * 1000); // 10 minutes
+        await cacheManager.set(cacheKey, responseData, { ttl: 10 * 60 * 1000, persistToStorage: true }); // 10 minutes
 
         // Add cache metrics to response
         const metrics = cacheManager.getMetrics();

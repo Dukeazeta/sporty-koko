@@ -47,7 +47,7 @@ export async function GET() {
                     }
 
                     // Fetch head-to-head data (with rate limit check)
-                    let h2hResult = { matches: [], rateLimitInfo: { isRateLimited: false } };
+                    let h2hResult: { matches: any[], rateLimitInfo: RateLimitInfo } = { matches: [], rateLimitInfo: { isRateLimited: false } };
                     try {
                         h2hResult = await fetchHeadToHead(match.homeTeamId, match.awayTeamId);
                     } catch (error) {

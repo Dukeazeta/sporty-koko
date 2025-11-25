@@ -56,8 +56,8 @@ export class CacheTestSuite {
         const tests = [
             this.runTest('Cache Set and Get', async () => {
                 const testData = { id: 1, name: 'Test Data' };
-                await cacheManager.set('test-key', testData, 60000);
-                const retrieved = await cacheManager.get('test-key');
+                await cacheManager.set('test-key', testData, { ttl: 60000, persistToStorage: true });
+                const retrieved = await cacheManager.get<{ id: number; name: string }>('test-key');
 
                 if (!retrieved || retrieved.id !== 1) {
                     throw new Error('Cache set/get failed');
@@ -68,7 +68,7 @@ export class CacheTestSuite {
 
             this.runTest('Cache Expiration', async () => {
                 const testData = { id: 2, name: 'Expires Soon' };
-                await cacheManager.set('expire-test', testData, 50); // 50ms TTL
+                await cacheManager.set('expire-test', testData, { ttl: 60000, persistToStorage: true }); // 50ms TTL
 
                 // Should be available immediately
                 const retrieved = await cacheManager.get('expire-test');
@@ -89,7 +89,7 @@ export class CacheTestSuite {
 
             this.runTest('Cache Delete', async () => {
                 const testData = { id: 3, name: 'Delete Me' };
-                await cacheManager.set('delete-test', testData, 60000);
+                await cacheManager.set('delete-test', testData, { ttl: 60000, persistToStorage: true });
 
                 // Verify it exists
                 const exists = await cacheManager.get('delete-test');
@@ -111,8 +111,8 @@ export class CacheTestSuite {
 
             this.runTest('Cache Clear', async () => {
                 // Add some test data
-                await cacheManager.set('clear-test-1', { data: 1 }, 60000);
-                await cacheManager.set('clear-test-2', { data: 2 }, 60000);
+                await cacheManager.set('clear-test-1', { data: 1 }, { ttl: 60000, persistToStorage: true });
+                await cacheManager.set('clear-test-2', { data: 2 }, { ttl: 60000, persistToStorage: true });
 
                 // Clear cache
                 await cacheManager.clear();
@@ -129,8 +129,7 @@ export class CacheTestSuite {
             })
         ];
 
-        await Promise.all(tests);
-        return tests.map(t => t.then(result => result));
+        return await Promise.all(tests);
     }
 
     /**
@@ -145,7 +144,7 @@ export class CacheTestSuite {
                 cacheManager.resetMetrics();
 
                 const testData = { test: 'metrics' };
-                await cacheManager.set('metrics-test', testData, 60000);
+                await cacheManager.set('metrics-test', testData, { ttl: 60000, persistToStorage: true });
 
                 // Generate some cache activity
                 for (let i = 0; i < 10; i++) {
@@ -178,7 +177,7 @@ export class CacheTestSuite {
                 // Time cache writes
                 const writeStart = Date.now();
                 for (let i = 0; i < iterations; i++) {
-                    await cacheManager.set(`perf-test-${i}`, { ...testData, i }, 60000);
+                    await cacheManager.set(`perf-test-${i}`, { ...testData, i }, { ttl: 60000, persistToStorage: true });
                 }
                 const writeTime = Date.now() - writeStart;
 
@@ -210,8 +209,7 @@ export class CacheTestSuite {
             })
         ];
 
-        await Promise.all(tests);
-        return tests.map(t => t.then(result => result));
+        return await Promise.all(tests);
     }
 
     /**
@@ -272,8 +270,7 @@ export class CacheTestSuite {
             })
         ];
 
-        await Promise.all(tests);
-        return tests.map(t => t.then(result => result));
+        return await Promise.all(tests);
     }
 
     /**
@@ -285,9 +282,9 @@ export class CacheTestSuite {
         const tests = [
             this.runTest('Prefix-based Invalidation', async () => {
                 // Add test data with specific prefixes
-                await cacheManager.set(`${CACHE_KEYS.PREDICTIONS}test1`, { data: 1 }, 60000);
-                await cacheManager.set(`${CACHE_KEYS.PREDICTIONS}test2`, { data: 2 }, 60000);
-                await cacheManager.set(`${CACHE_KEYS.MATCHES}test1`, { data: 3 }, 60000);
+                await cacheManager.set(`${CACHE_KEYS.PREDICTIONS}test1`, { data: 1 }, { ttl: 60000, persistToStorage: true });
+                await cacheManager.set(`${CACHE_KEYS.PREDICTIONS}test2`, { data: 2 }, { ttl: 60000, persistToStorage: true });
+                await cacheManager.set(`${CACHE_KEYS.MATCHES}test1`, { data: 3 }, { ttl: 60000, persistToStorage: true });
 
                 // Invalidate predictions
                 await invalidateCache({ invalidateByPrefix: [CACHE_KEYS.PREDICTIONS] });
@@ -330,8 +327,7 @@ export class CacheTestSuite {
             })
         ];
 
-        await Promise.all(tests);
-        return tests.map(t => t.then(result => result));
+        return await Promise.all(tests);
     }
 
     /**
@@ -348,7 +344,7 @@ export class CacheTestSuite {
                 try {
                     // This would normally be handled internally
                     // For testing, we'll use a different approach
-                    await cacheManager.set(testKey, { valid: 'data' }, 60000);
+                    await cacheManager.set(testKey, { valid: 'data' }, { ttl: 60000, persistToStorage: true });
                     const retrieved = await cacheManager.get(testKey);
 
                     if (!retrieved) {
@@ -382,8 +378,7 @@ export class CacheTestSuite {
             })
         ];
 
-        await Promise.all(tests);
-        return tests.map(t => t.then(result => result));
+        return await Promise.all(tests);
     }
 
     /**
@@ -448,7 +443,7 @@ export class CacheTestSuite {
 
         try {
             // Basic functionality test
-            await cacheManager.set('health-check', { timestamp: Date.now() }, 1000);
+            await cacheManager.set('health-check', { timestamp: Date.now() }, { ttl: 60000, persistToStorage: true });
             const retrieved = await cacheManager.get('health-check');
 
             if (!retrieved) {

@@ -58,18 +58,27 @@ const checkRateLimit = (): RateLimitInfo => {
     const windowStart = now - RATE_LIMIT_WINDOW;
 
     // Clean old entries
-    for (const [key, entry] of requestCache.entries()) {
+    requestCache.forEach((entry, key) => {
         if (entry.timestamp < windowStart) {
             requestCache.delete(key);
         }
-    }
+    });
 
-    const recentRequests = Array.from(requestCache.values())
-        .filter(entry => entry.timestamp >= windowStart)
-        .reduce((sum, entry) => sum + entry.count, 0);
+    let recentRequests = 0;
+    requestCache.forEach((entry) => {
+        if (entry.timestamp >= windowStart) {
+            recentRequests += entry.count;
+        }
+    });
 
     if (recentRequests >= MAX_REQUESTS_PER_WINDOW) {
-        const oldestRequest = Math.min(...Array.from(requestCache.values()).map(e => e.timestamp));
+        let oldestRequest = now;
+        requestCache.forEach((entry) => {
+            if (entry.timestamp < oldestRequest) {
+                oldestRequest = entry.timestamp;
+            }
+        });
+
         const resetTime = new Date(oldestRequest + RATE_LIMIT_WINDOW);
         const cooldownMinutes = Math.ceil((resetTime.getTime() - now) / (60 * 1000));
 
@@ -154,7 +163,7 @@ const setCache = async <T>(
 ): Promise<void> => {
     try {
         const dataWithRateInfo = { ...data, rateLimitInfo: rateInfo };
-        await cacheManager.set(key, dataWithRateInfo, ttl);
+        await cacheManager.set(key, dataWithRateInfo, { ttl, persistToStorage: true });
     } catch (error) {
         console.warn(`Cache set failed for key ${key}:`, error);
     }
